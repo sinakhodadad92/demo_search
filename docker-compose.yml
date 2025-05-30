@@ -1,0 +1,45 @@
+version: "3.9"
+
+services:
+# ───────────────────────── Elasticsearch ──────────────────────────
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.14.0
+    environment:
+      - discovery.type=single-node          # dev-mode, no cluster
+      - xpack.security.enabled=false        # disable auth
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m      # 512 MB heap
+    ports:
+      - "9200:9200"                         # host → container
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+
+# ───────────────────────── Django backend  ─────────────────────────
+  backend:
+    build: ./backend                        # Dockerfile lives in backend/
+    depends_on:
+      - elasticsearch
+    environment:
+      - ES_HOST=http://elasticsearch:9200
+      - DJANGO_SETTINGS_MODULE=backend.settings
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./data:/code/data                   # JSONL + PDFs are here
+    ports:
+      - "8000:8000"                         # host:8000 → Gunicorn
+    # The ENTRYPOINT is set inside the Dockerfile:
+    #   COPY docker/entrypoint.sh /entrypoint.sh
+    #   RUN chmod +x /entrypoint.sh
+    #   ENTRYPOINT ["/entrypoint.sh"]
+
+# ───────────────────────── React / Vite frontend (optional) ───────
+#  frontend:
+#    build: ./frontend                      # if you have a Dockerfile
+#    depends_on:
+#      - backend
+#    ports:
+#      - "5173:5173"                        # Vite dev server
+#    environment:
+#      - VITE_API_BASE=http://localhost:8000
+
+volumes:
+  esdata:
